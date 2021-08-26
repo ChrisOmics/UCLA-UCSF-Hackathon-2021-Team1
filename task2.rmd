@@ -397,7 +397,7 @@ filename = "hackathon2021-task2_filtered.RData"
 
 
 #Choose what to regress out - could be age, sex, or any metadata column
-regress = c("nCount_RNA","percent.mito")
+regress = c("nCount_RNA","id")
 
 #Decide whether to use SCtransform (can take a long time with big datasets; generally recommended)
 sct = TRUE
@@ -469,7 +469,24 @@ PrintSeuratGraph = function(namecard = "a",seurat_object = sobject,graphtype = "
 }
 ```
 
+```{r}
+dblts = read.table(file.path(dir,"task2.demuxlet.txt"))
+head(dblts)
+ID = dblts$ANON.ID
+names(ID) = rownames(dblts)
 
+ID = ID[match(colnames(sobject),names(ID))]
+head(ID)
+head(colnames(sobject))
+
+identical(colnames(sobject),names(ID)) #should be true
+sobject$id = ID
+
+
+x = colnames(sobject)
+lane = sapply(colnames(sobject),function(x){strsplit(x,split = "-")[[1]][2]})
+sobject$lane = lane
+```
 
 Find variable features, normalize, scale, run PCA, clustering, umap
 The following is the standard method of normalization and scaling. Interchangeable with the next chunk. Run both, you should have already specified which to use with "sct = T or F". Will take 5-20 minutes to run. 
@@ -490,23 +507,8 @@ plot1 = VariableFeaturePlot(sobject)
 LabelPoints(plot=plot1, points = labels, repel = F, xnudge = 0.1, ynudge = 0.5)
 ```
 
-read in the doublet data to see if they've been removed
-**note: I need this for individual identification!!
 
-```{r}
-dblts = read.table(file.path(dir,"task2.demuxlet.txt"))
-head(dblts)
-ID = dblts$ANON.ID
-names(ID) = rownames(dblts)
 
-ID = ID[match(colnames(sobject),names(ID))]
-head(ID)
-head(colnames(sobject))
-
-identical(colnames(sobject),names(ID)) #should be true
-sobject$id = ID
-
-```
 
 Remove genes that correlate strongly with technical variables from downstream analyses
 
