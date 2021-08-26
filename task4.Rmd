@@ -1,0 +1,172 @@
+---
+title: "Task4"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(tidyr)
+library(DT)
+library(reshape2)
+#library(plotly)
+library(viridis)
+library(ggplot2)
+```
+
+# Read in data
+
+```{r}
+
+# demuxlet data, contains ID
+id <- read.delim("/home/rstudio/Student_Access_Hackathon_2021/input/task4.demuxlet.txt")
+
+# cell identity data
+cell <- read.delim("/home/rstudio/Student_Access_Hackathon_2021/input/task4.anno.txt")
+
+# BCR data
+bcr <- read.csv("/home/rstudio/Student_Access_Hackathon_2021/input/task4.BCR.contig_annotations.csv")
+bcr <- bcr %>% filter(high_confidence == "True")
+
+# TCR data
+tcr <- read.csv("/home/rstudio/Student_Access_Hackathon_2021/input/task4.TCR.contig_annotations.csv")
+tcr <- tcr %>% filter(high_confidence == "True")
+
+#ab.data <- Read10X(data.dir = "/home/rstudio/Student_Access_Hackathon_2021/input/task4.ab/")
+#ab <- CreateSeuratObject(counts = ab.data, project = "ab", min.cells = 3, min.features = 200)
+
+#gene.data <- Read10X(data.dir = "/home/rstudio/Student_Access_Hackathon_2021/input/task4.gene_expr/")
+#gene <- CreateSeuratObject(counts = gene.data, project = "ab", min.cells = 3, min.features = 200)
+
+```
+
+# Cell-types
+
+```{r, fig.height=10, fig.width=10}
+
+cell_id <- inner_join(id, cell)
+
+# Name people if already known
+cell_id$ANON.ID[which(cell_id$ANON.ID == "IND0")] <- "CTL1_IND0"
+cell_id$ANON.ID[which(cell_id$ANON.ID == "IND2")] <- "CTL2_IND2"
+cell_id$ANON.ID[which(cell_id$ANON.ID == "IND12")] <- "CTL3_IND12"
+cell_id$ANON.ID[which(cell_id$ANON.ID == "IND6")] <- "MM_B_IND6"
+
+# Display which cells belong to which
+cell_subsets <- cell_id %>% dplyr::select(c("Coarse", "Fine")) %>% distinct() %>% arrange(Coarse)
+datatable(cell_subsets)
+colnames(cell_subsets)[2] <- "cell"
+
+# Table of cells per person
+table_cell_coarse <- cell_id %>% group_by(ANON.ID, Coarse) %>% dplyr::summarise(n = n()) %>% spread(Coarse, n) %>% replace(is.na(.), 0)
+table_cell_fine <- cell_id %>% group_by(ANON.ID, Fine) %>% dplyr::summarise(n = n()) %>% spread(Fine, n) %>% replace(is.na(.), 0)
+
+# percentages
+table_cell_coarse_pc <- data.frame(ANON.ID = table_cell_coarse$ANON.ID, t(apply(table_cell_coarse[,2:ncol(table_cell_coarse)], 1, function(x) {100*x/sum(x, na.rm = T)})))
+table_cell_fine_pc <- data.frame(ANON.ID = table_cell_fine$ANON.ID, t(apply(table_cell_fine[,2:ncol(table_cell_fine)], 1, function(x) {100*x/sum(x, na.rm = T)})))
+
+# Tables
+datatable(data.frame(ANNO.ID = table_cell_coarse$ANON.ID, total_cells = rowSums(table_cell_coarse[,2:ncol(table_cell_coarse)])))
+datatable(table_cell_coarse)
+datatable(table_cell_coarse_pc %>% mutate_if(is.numeric, ~signif(., 3)))
+datatable(table_cell_fine)
+datatable(table_cell_fine_pc %>% mutate_if(is.numeric, ~signif(., 3)))
+
+# Plot
+table_cell_coarse_pc.long <- melt(table_cell_coarse_pc, id.vars = c("ANON.ID"), variable.name = c("cell"), value.name = "prop")
+ggplot(table_cell_coarse_pc.long, aes(x = ANON.ID, y = prop, fill = cell)) + geom_col() + scale_fill_viridis_d() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+table_cell_fine_pc.long <- melt(table_cell_fine_pc, id.vars = c("ANON.ID"), variable.name = c("cell"), value.name = "prop")
+table_cell_fine_pc.long <- left_join(table_cell_fine_pc.long, cell_subsets) # add Coarse annotation
+ggplot(table_cell_fine_pc.long, aes(x = ANON.ID, y = prop, fill = cell)) + geom_col() + scale_fill_viridis_d() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + facet_wrap(~ Coarse)
+
+#fig <- plot_ly(table_cell_coarse_pc.long, x = ~ANON.ID, y = ~prop, type = 'bar', name = 'coarse')
+
+```
+
+# Heatmap based on cell-types
+
+```{r}
+
+library(corrplot)
+correlations <- cor(t(table_cell_fine[,c(2:ncol(table_cell_fine))])) 
+colnames(correlations) <- table_cell_fine$ANON.ID
+rownames(correlations) <- table_cell_fine$ANON.ID
+corrplot(correlations, order = "hclust", method = "circle")
+
+```
+
+# BCR
+
+```{r}
+
+colnames(bcr)[1] <- "X"
+bcr_id <- inner_join(id, bcr)
+table(bcr_id$ANON.ID)
+
+# Name people if already known
+bcr_id$ANON.ID[which(bcr_id$ANON.ID == "IND0")] <- "CTL1_IND0"
+bcr_id$ANON.ID[which(bcr_id$ANON.ID == "IND2")] <- "CTL2_IND2"
+bcr_id$ANON.ID[which(bcr_id$ANON.ID == "IND12")] <- "CTL3_IND12"
+bcr_id$ANON.ID[which(bcr_id$ANON.ID == "IND6")] <- "MM_B_IND6"
+
+table(bcr_id$full_length)
+table(bcr_id$productive)
+
+# Summarise
+bcr_full_length <- bcr_id %>% group_by(ANON.ID, full_length) %>% summarise(N = n()) %>% spread(full_length, N) %>% replace(is.na(.), 0) %>% mutate(sums = False + True) %>% mutate(True_pc = True/sums)
+bcr_productive <- bcr_id %>% group_by(ANON.ID, productive) %>% summarise(N = n()) %>% spread(productive, N) %>% replace(is.na(.), 0) %>% mutate(sums = False + True) %>% mutate(True_pc = True/sums)
+
+colnames(bcr_full_length)[2:ncol(bcr_full_length)] <- paste(colnames(bcr_full_length)[2:ncol(bcr_full_length)], "_bcr", sep = "") 
+colnames(bcr_productive)[2:ncol(bcr_productive)] <- paste(colnames(bcr_productive)[2:ncol(bcr_productive)], "_bcr", sep = "") 
+
+# Look at common variable region (for CVID)
+bcr_c_gene <- bcr_id %>% group_by(ANON.ID, c_gene) %>% dplyr::summarise(N = n()) %>% spread(c_gene, N)
+datatable(bcr_c_gene)
+
+bcr_c_gene_NA <- data.frame(ANON.ID = bcr_c_gene$ANON.ID, c_gene_NA = apply(bcr_c_gene, 1, function(x) length(which(is.na(x)))))
+datatable(bcr_c_gene_NA)
+
+```
+
+# TCR
+
+```{r}
+
+colnames(tcr)[1] <- "X"
+tcr_id <- inner_join(id, tcr)
+table(tcr_id$ANON.ID)
+
+# Name people if already known
+tcr_id$ANON.ID[which(tcr_id$ANON.ID == "IND0")] <- "CTL1_IND0"
+tcr_id$ANON.ID[which(tcr_id$ANON.ID == "IND2")] <- "CTL2_IND2"
+tcr_id$ANON.ID[which(tcr_id$ANON.ID == "IND12")] <- "CTL3_IND12"
+tcr_id$ANON.ID[which(tcr_id$ANON.ID == "IND6")] <- "MM_B_IND6"
+
+table(tcr_id$full_length)
+table(tcr_id$productive)
+
+# Summarise
+tcr_full_length <- tcr_id %>% group_by(ANON.ID, full_length) %>% summarise(N = n()) %>% spread(full_length, N) %>% replace(is.na(.), 0) %>% mutate(sums = False + True) %>% mutate(True_pc = True/sums)
+tcr_productive <- tcr_id %>% group_by(ANON.ID, productive) %>% summarise(N = n()) %>% spread(productive, N) %>% replace(is.na(.), 0) %>% mutate(sums = False + True) %>% mutate(True_pc = True/sums)
+
+colnames(tcr_full_length)[2:ncol(tcr_full_length)] <- paste(colnames(tcr_full_length)[2:ncol(tcr_full_length)], "_tcr", sep = "") 
+colnames(tcr_productive)[2:ncol(tcr_productive)] <- paste(colnames(tcr_productive)[2:ncol(tcr_productive)], "_tcr", sep = "") 
+
+```
+
+# B + T cells
+
+```{r}
+
+bcr_tcr_full_length <- inner_join(bcr_full_length, tcr_full_length)
+datatable(bcr_tcr_full_length %>% mutate_if(is.numeric, ~signif(., 3)))
+
+```
