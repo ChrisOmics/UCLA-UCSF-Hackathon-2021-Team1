@@ -58,7 +58,7 @@ min.cells = 1
 min.features = 1
 
 #Name your project something descriptive
-project<-"hackathon2021" 
+project<-"hackathon2021-task2" 
 
 #Specify your organism; please capitalize the first letter (i.e. "Mouse", "Human","Zebrafish","Rat")
 organism = "Human"
@@ -380,16 +380,16 @@ save(sobject,file = file.path(dir,"outputs",paste0(project,"_beforeQC.RData")))
 Subset the data. Printing tables lets you see the progression as you tighten your QC cutoffs. 
 ```{r}
 print("initial")
-table(sobject$sample_description) #print out initial cell counts
+table(sobject$orig.ident) #print out initial cell counts
 sobject = subset(sobject, subset = percent.mito>mlo & percent.mito < mhi) #subset mitochondria
 print("mito")
-table(sobject$sample_description) #new cell counts
+table(sobject$orig.ident) #new cell counts
 sobject = subset(sobject, subset = nCount_RNA>clo & nCount_RNA < chi)
 print("ncount")
-table(sobject$sample_description)
+table(sobject$orig.ident)
 sobject = subset(sobject, subset = nFeature_RNA>flo & nFeature_RNA < chi)
 print("nfeature")
-table(sobject$sample_description)
+table(sobject$orig.ident)
 ```
 
 ```{r}
