@@ -1,0 +1,30 @@
+---
+title: "Task3"
+author: "Christopher Robles"
+date: "8/26/2021"
+output: html_document
+---
+
+
+```{r}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+```
+
+```{r}
+# Load the PBMC dataset
+task3.data <- Read10X(data.dir = "data/task3.gene_expr")
+# Initialize the Seurat object with the raw (non-normalized data).
+task3 <- CreateSeuratObject(counts = task3.data, project = "task3", min.cells = 3, min.features = 200)
+
+task3.annot <- read.table("data/task3.anno.txt")
+
+cellTypeC="T4"
+cellTypeF="T4_Naive"
+cellids= row.names(task3.annot %>% filter(Coarse == cellTypeC & Fine ==cellTypeF))
+
+colnames(task3) == cellids
+
+
+```
