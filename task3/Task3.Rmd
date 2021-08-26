@@ -52,8 +52,8 @@ mlo = 0.75
 mhi = 10
 clo = 500
 chi = 8500
-flo = 200 
-fhi = 2500
+flo = 250 
+fhi = 2700
 
 m = c("nCount_RNA","nFeature_RNA","percent.mito")
 tablelow = c(clo,flo,mlo)
