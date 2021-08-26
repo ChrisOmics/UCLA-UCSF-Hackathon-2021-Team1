@@ -10,21 +10,71 @@ output: html_document
 library(dplyr)
 library(Seurat)
 library(patchwork)
+library(ggplot2)
 ```
 
 ```{r}
-# Load the PBMC dataset
-task3.data <- Read10X(data.dir = "data/task3.gene_expr")
+# Load the  dataset
+sobject.data <- Read10X(data.dir = "data/task3.gene_expr")
 # Initialize the Seurat object with the raw (non-normalized data).
-task3 <- CreateSeuratObject(counts = task3.data, project = "task3", min.cells = 3, min.features = 200)
+sobject <- CreateSeuratObject(counts = sobject.data, project = "task3", min.cells = 3, min.features = 200)
 
-task3.annot <- read.table("data/task3.anno.txt")
+```
 
-cellTypeC="T4"
-cellTypeF="T4_Naive"
-cellids= row.names(task3.annot %>% filter(Coarse == cellTypeC & Fine ==cellTypeF))
+```{r}
+#adding metadata of cell type coarse and fine
 
-colnames(task3) == cellids
+sobject.annot <- read.table("data/task3.anno.txt", row.names = NULL)
+colnames(sobject.annot)[1]<-"barcode"
+sobject$celltypecoarse  = sobject.annot$Coarse
+sobject$celltypefine  = sobject.annot$Fine
 
+anno_vln = function(seurat_object = sobject, metric = "nCount_RNA", group = "orig.ident"){
+  #specify number of categories
+  n = length(levels(seurat_object@meta.data[,group]))
+  #make a violin plot
+  a = VlnPlot(seurat_object,metric,group.by = group,pt.size = 0,log = F,cols = rep("lightgrey",n))
+  #make a simple function that quantifies percentiles for each column
+  add.percentiles = function(x) {
+    r = quantile(x, probs = seq(0,1,0.2))
+    r
+  }
+  a + geom_boxplot(width = 0.05,outlier.size = 0,notchwidth = 10,notch = T) + theme_bw() + stat_summary(fun=add.percentiles, geom="point", pch="_", colour=c(rep(c("red3","purple","yellow","forestgreen","darkblue","grey"),n)), size=10)
+}
+```
 
+```{r}
+#adding mito and ribo percent for QC
+sobject<- PercentageFeatureSet(sobject, pattern = "^MT-", col.name = "percent.mito")
+sobject<- PercentageFeatureSet(sobject, pattern = "^RP", col.name = "percent.ribo")
+
+mlo = 0.75
+mhi = 10
+clo = 500
+chi = 8500
+flo = 200 
+fhi = 2500
+
+m = c("nCount_RNA","nFeature_RNA","percent.mito")
+tablelow = c(clo,flo,mlo)
+tablehigh = c(chi,fhi,mhi)
+t = as.data.frame(rbind(tablelow,tablehigh))
+colnames(t) = m
+
+VlnPlot(sobject, features = c("nFeature_RNA", "nCount_RNA", "percent.mito"), ncol = 3, pt.size = 0)
+
+for (i in 1:ncol(t)){
+   metric = colnames(t)[i]
+  low = t[1,i]
+  high = t[2,i]
+  graph = anno_vln(metric = metric) + geom_abline(intercept = high, slope = 0, linetype = "dashed",color = "red", size = 0.8) + geom_abline(intercept = low, slope = 0, linetype = "dashed",color = "black", size = .8)
+  print(graph)
+}
+```
+```{r}
+dblts = read.table("data/task3.demuxlet.txt")
+table(dblts$DROPLET.TYPE) #all singlets
+head(colnames(sobject))
+all(colnames(sobject) %in% rownames(dblts))
+all(rownames(dblts) %in% colnames(sobject))
 ```

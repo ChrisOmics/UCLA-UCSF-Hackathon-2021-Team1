@@ -1,0 +1,38 @@
+{
+    "type": [
+        2,
+        0,
+        1,
+        2,
+        0,
+        1,
+        0,
+        1,
+        3,
+        0,
+        1,
+        2,
+        0,
+        3,
+        3,
+        3
+    ],
+    "data": [
+        "\nR version 4.1.1 (2021-08-10) -- \"Kick Things\"\nCopyright (C) 2021 The R Foundation for Statistical Computing\nPlatform: x86_64-pc-linux-gnu (64-bit)\n\nR is free software and comes with ABSOLUTELY NO WARRANTY.\nYou are welcome to redistribute it under certain conditions.\nType 'license()' or 'licence()' for distribution details.\n\nR is a collaborative project with many contributors.\nType 'contributors()' for more information and\n'citation()' on how to cite R or R packages in publications.\n\nType 'demo()' for some demos, 'help()' for on-line help, or\n'help.start()' for an HTML browser interface to help.\nType 'q()' to quit R.\n\n",
+        "> ",
+        "getwd()",
+        "[1] \"/home/rstudio\"\n",
+        "> ",
+        "setwd(\"/home/\")",
+        "> ",
+        "l",
+        "Error: object 'l' not found\n",
+        "> ",
+        "ls()",
+        "character(0)\n",
+        "> ",
+        "26 Aug 2021 20:16:55 [rsession-rstudio] ERROR system error 2 (No such file or directory) [path: /home/rstudio/.local/share/rstudio/monitored]; OCCURRED AT void rstudio::core::system::file_monitor::detail::run(const rstudio_boost::function<void()>&) src/cpp/core/system/file_monitor/LinuxFileMonitor.cpp:562; LOGGED FROM: void rstudio::session::module_context::{anonymous}::onMonitoringError(const rstudio::core::Error&) src/cpp/session/SessionModuleContext.cpp:632\n",
+        "26 Aug 2021 20:16:55 [rsession-rstudio] ERROR system error 2 (No such file or directory) [path: /home/rstudio/.config/rstudio]; OCCURRED AT void rstudio::core::system::file_monitor::detail::run(const rstudio_boost::function<void()>&) src/cpp/core/system/file_monitor/LinuxFileMonitor.cpp:562; LOGGED FROM: void rstudio::session::prefs::PrefLayer::fileMonitorTermination(const rstudio::core::Error&) src/cpp/session/prefs/PrefLayer.cpp:324\n",
+        "26 Aug 2021 20:16:55 [rsession-rstudio] ERROR system error 2 (No such file or directory) [path: /home/rstudio]; OCCURRED AT void rstudio::core::system::file_monitor::detail::run(const rstudio_boost::function<void()>&) src/cpp/core/system/file_monitor/LinuxFileMonitor.cpp:562; LOGGED FROM: rstudio::core::Error rstudio::session::modules::files::FilesListingMonitor::start(const rstudio::core::FilePath&, bool, rstudio::core::json::Array*) src/cpp/session/modules/SessionFilesListingMonitor.cpp:81\n"
+    ]
+}
