@@ -17,6 +17,16 @@ library(ggplot2)
 library(ProjecTILs)
 ```
 
+
+Basic: using their T-cell data
+
+```{r}
+library(ProjecTILs)
+data(query_example_seurat)
+
+make.projection(query_example_seurat)
+```
+
 ```{r}
 #Set up parameters
 robject = "/Users/whippoorwill/Desktop/Sequencing/LD_AVM02/Data/Seurat/mgAVM02_customUMAP_newPCA.rds"
