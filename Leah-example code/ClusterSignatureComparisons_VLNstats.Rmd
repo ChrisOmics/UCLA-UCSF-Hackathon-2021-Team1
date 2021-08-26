@@ -1,0 +1,238 @@
+---
+title: "Seurat_Code_Filtering_2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#install.packages("BiocManager")
+#BiocManager::install("Seurat")
+#BiocManager::install("ggplot2")
+#install.packages("dplr")
+#install.packages("ape")
+#install.packages("cowplot")
+#install.packages("Matrix")
+
+#BiocManager::install("variancePartition")
+```
+
+Load packages into your workspace. 
+
+```{r}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(ape)
+library(cowplot)
+library(Matrix)
+library(variancePartition)
+library(harmony)
+
+#find out where you are
+getwd()
+```
+Question: Does c-fos expression correlate with Marco or Tlr2? 
+
+```{r}
+for (gene in c("Marco","Tlr2","Fos")){
+  PrintSeuratGraph(seurat_object = sobject,graphtype = "feature",feature = gene)
+}
+Idents(sobject) = "sample_description"
+#split cells by Fos expression: 
+fos = GetAssayData(sobject,assay = "RNA", slot = "counts")["Fos",]
+names = names(fos)
+fos = as.numeric(fos)
+names(fos) = names
+fos[fos>0] = "active"
+fos[fos != "active"] = "inactive"
+  #add in a new metadata column
+sobject$fos = fos
+  #Check with a violin plot
+
+add.percentiles = function(x) {
+    r = quantile(x, probs = c(0.75))
+    sd = sd(x)
+    r = c(r,sd)
+  }
+
+sobject2 = subset(sobject,idents = "WT-IL33")
+x = sobject2$seurat_clusters
+levels(x)[2] = "responsive"
+levels(x)[c(1,3,4,5,6)] = "nonresponsive"
+sobject2$response = x
+Idents(sobject2) = "fos"
+
+setEPS()
+postscript("~/Desktop/Sequencing/scrnaseq-rafael/Plots/vln_Marco_WTIL33-withmedian.eps")
+VlnPlot(sobject2,"Marco",group.by = "response",split.by = "fos",pt.size = 0) + stat_summary(fun=add.percentiles, geom="point", pch="_", size=10)
+dev.off()
+
+setEPS()
+postscript("~/Desktop/Sequencing/scrnaseq-rafael/Plots/vln_Marco_WTIL33-active_thirdquartile.eps")
+VlnPlot(sobject2,"Marco",group.by = "response",idents = "active",pt.size = 0) + stat_summary(fun=add.percentiles, geom="point", pch="_", size=10)
+dev.off()
+
+setEPS()
+postscript("~/Desktop/Sequencing/scrnaseq-rafael/Plots/vln_Marco_WTIL33-inactive_thirdquartile.eps")
+VlnPlot(sobject2,"Marco",group.by = "response",idents = "inactive",pt.size = 0) + stat_summary(fun=add.percentiles, geom="point", pch="_", size=10)
+dev.off()
+
+setEPS()
+postscript("~/Desktop/Sequencing/scrnaseq-rafael/Plots/vln_Tlr2_WTIL33-thirdquartile.eps")
+VlnPlot(sobject2,"Tlr2",group.by = "response",split.by = "fos",pt.size = 0) + stat_summary(fun=add.percentiles, geom="point", pch="_", size=10)
+dev.off()
+
+setEPS()
+postscript("~/Desktop/Sequencing/scrnaseq-rafael/Plots/vln_Tlr2_WTIL33-active_thirdquartile.eps")
+VlnPlot(sobject2,"Tlr2",group.by = "response",idents = "active",pt.size = 0) + stat_summary(fun=add.percentiles, geom="point", pch="_", size=10)
+dev.off()
+
+setEPS()
+postscript("~/Desktop/Sequencing/scrnaseq-rafael/Plots/vln_Tlr2_WTIL33-inactive_thirdquartile.eps")
+VlnPlot(sobject2,"Tlr2",group.by = "response",idents = "inactive",pt.size = 0) + stat_summary(fun=add.percentiles, geom="point", pch="_", size=10)
+dev.off()
+
+
+#or, make them all binary: 
+Marco = GetAssayData(sobject,assay = "RNA", slot = "counts")["Marco",]
+names = names(Marco)
+Marco = as.numeric(Marco)
+names(Marco) = names
+  #add in a new metadata column
+sobject2$Marco = Marco
+
+#or, make them all binary: 
+Tlr2 = GetAssayData(sobject,assay = "RNA", slot = "counts")["Tlr2",]
+names = names(Tlr2)
+Tlr2 = as.numeric(Tlr2)
+names(Tlr2) = names
+  #add in a new metadata column
+sobject2$Tlr2 = Tlr2
+
+#graph Tlr2 and Marco based on expression of fos
+plot(x = sobject2$Marco,y=sobject2$Tlr2)
+x = sobject2@meta.data[,c("Marco","Tlr2","fos","response")]
+head(x)
+write.csv(x,file = file.path(dir,"Spreadsheets","marco_tlr2_fosbinary_WTIL33only.csv") )
+```
+```{r}
+fos = GetAssayData(sobject,assay = "SCT", slot = "data")[c("Fos","Marco","Tlr2"),]
+plot(x = fos["Fos",], y = fos["Tlr2",])
+```
+
+```{r}
+table(sobject$sample_description,sobject$fos)
+active = names(sobject$fos[sobject$fos == "active"])
+inactive = names(sobject$fos[sobject$fos == "inactive"])
+s = names(sobject$sample_description[sobject$sample_description== "WT-IL33"])
+
+marco = GetAssayData(sobject,slot = "data")["Marco",]
+
+#only cells in the WT-IL33 condition
+marco = marco[names(marco) %in% s]
+length(marco)
+#active c-fos+ cells
+marco_active = marco[names(marco) %in% active]
+length(marco_active)
+
+#inactive c-fos- cells
+marco_inactive = marco[names(marco) %in% inactive]
+length(marco_inactive)
+
+
+#total cells with fos that have marco expression
+sum(marco_active>0)
+
+
+#total number of cells without fos
+sum(marco_inactive>0)
+
+#Average marco expression in active cells
+mean(marco_active)
+mean(marco_active[marco_active>0])
+
+#average marco expression in in-active cells
+mean(marco_inactive)
+mean(marco_inactive[marco_inactive>0])
+
+write.csv(marco_active,file = file.path(dir,"Spreadsheets","marco_in_cfos_pos_WTIL33.csv"))
+
+write.csv(marco_inactive,file = file.path(dir,"Spreadsheets","marco_in_cfos_neg_WTIL33.csv"))
+```
+
+Look for cluster 1 signature in other cells: 
+```{r}
+clustermarkers = read.csv("/Users/whippoorwill/Desktop/Sequencing/scrnaseq-rafael/Spreadsheets/Rafael_lowres_sct_harmonyres0_2_all_markers.csv",stringsAsFactors = F)
+clustermarkers_IL33 = clustermarkers[clustermarkers$cluster == '1',]
+clustermarkers_IL33 = clustermarkers_IL33[clustermarkers_IL33$avg_log2FC>1,]
+clustermarkers_IL33 = clustermarkers_IL33[clustermarkers_IL33$p_val_adj<1e-25,]
+goi = list(c(clustermarkers_IL33$gene))
+
+sobject = AddModuleScore(sobject,features = goi,name = "IL33module")
+sobject = PercentageFeatureSet(sobject,features = goi[[1]],col.name = "IL33_genes")
+
+Idents(sobject) = "condition"
+VlnPlot(sobject,"IL33module1",group.by = "seurat_clusters",split.by = "genotype",pt.size = 0,idents = "PBS")
+VlnPlot(sobject,"IL33_genes",group.by = "seurat_clusters",split.by = "genotype",pt.size = 0,idents = "PBS")
+
+```
+Significance
+```{r}
+#1. isolate the condition you care about (PBS) and the data table (IL33module1, IL33_genes)
+t = sobject@meta.data[sobject@meta.data$condition == "PBS",c("IL33module1","IL33_genes","genotype","seurat_clusters")]
+
+#2. What you want to compare: genotype for both within each cluster (but remove cluster 1)
+t = t[t$seurat_clusters != "1",]
+t = droplevels(t)
+
+table(t$seurat_clusters, t$genotype)
+
+library(car)
+my_anova <- aov(IL33module1 ~ genotype * seurat_clusters, data = t)
+Anova(my_anova, type = "III")
+#seurat_clusters is highly significant; genotype is significant; interaction is significant
+
+#plot, remove outliers (test for homogeneity of variances)
+plot(my_anova, 1) 
+t = t[rownames(t) != "TTCGATTGTACTCGCG-Sample3",]
+
+t$cluster_genotype = paste0(t$genotype,"_",t$seurat_clusters)
+
+
+leveneTest(IL33module1 ~ genotype * seurat_clusters, data = t) #does not pass
+
+
+kruskal.test(IL33module1 ~ cluster_genotype, data = t)
+pairwise.wilcox.test(t$IL33module1, g = t$cluster_genotype)
+
+#cluster 4 only = not significantly different. 
+t4 = t[t$seurat_clusters == "4",]
+wilcox.test(t4$IL33_genes ~ t4$genotype)
+```
+
+
+
+
+Conduct differential expression analysis on the celltypes (pooled)
+```{r}
+column = "celltype"
+ncells = 500
+```
+
+```{r,eval = FALSE}
+Idents(sobject) = column
+markers_all = FindAllMarkers(
+  object = sobject,
+  features = rownames(sobject),
+  test.use = "MAST", 
+  only.pos = FALSE, 
+  min.pct = 0.15, 
+  logfc.threshold = 0.0)
+write.csv(markers_all,file = file.path(dir,"Spreadsheets",paste0(iterationname,"_",column,"_markers.csv")))
+```
+

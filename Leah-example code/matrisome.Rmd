@@ -1,0 +1,160 @@
+---
+title: "matrisome"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Find out how many of your DE genes are part of the matrisome (http://matrisomeproject.mit.edu/)
+
+```{r}
+library(readr)
+library(Seurat)
+library(dplyr)
+dir = "~/Desktop/Sequencing/LD_AVM02"
+datafolder = "Data/Seurat"
+filename = "mgAVM02_may26.RData"
+mat_file = "https://raw.githubusercontent.com/lcdorman/scrnaseq/master/Spreadsheets/matrisome_mm_masterlist.csv"
+```
+
+Set thresholds for DE genes per cluster
+```{r}
+alpha = 1e-25
+foldchange = 0.2
+```
+
+You will need to add your own data here (note to Leah - put this on GEO so it can be loaded). Rename whatever seurat object you have as "sobject"
+```{r}
+load(file.path(dir,datafolder,filename))
+sobject = mgAVM02
+```
+
+
+```{r}
+de_file = file.path(dir,"Spreadsheets","Macrophage_only_all_markers.csv")
+```
+
+Read in matrisome file
+```{r}
+matrisome <- read.csv(mat_file,stringsAsFactors = F,fill = T)
+matrisome$Category = as.factor(matrisome$Category)
+matrisome$Division = as.factor(matrisome$Division)
+```
+
+Show matrisome summary
+```{r}
+table(matrisome$Division,matrisome$Category)
+```
+
+Read in DE genes file
+```{r}
+de = read.csv(de_file,stringsAsFactors = F,fill = T)
+de$cluster = as.factor(de$cluster)
+```
+
+Select only the genes that have been used for clustering in sobject
+```{r}
+genes = rownames(GetAssayData(sobject,slot = "scale.data"))
+all(de$gene %in% genes)
+
+#how many of the dataset genes are in the matrisome, and which subset are they
+m_subset = matrisome[matrisome$Gene.Symbol %in% genes,]
+dim(m_subset)
+table(m_subset$Division) 
+table(m_subset$Category) 
+
+#how many differentially expressed genes in each category are actually in this dataset
+#select only the genes that pass a threshold
+de = de[de$p_val_adj<alpha,]
+de = de[de$avg_logFC > foldchange | de$avg_logFC < -foldchange,]
+
+#make a separate data table with all up/down regulated genes
+deup = de[de$avg_logFC > foldchange,]
+dedown = de[de$avg_logFC < -foldchange,]
+
+#for each cluster, calculate # of matrisome genes in up- and down-regulated gene sets
+clusters = levels(de$cluster)
+ecmlist = {}
+for (cluster in clusters){
+  gup = deup[deup$cluster == cluster,"gene"]
+  gupecm = matrisome[matrisome$Gene.Symbol %in% gup,]
+  gdown = dedown[dedown$cluster == cluster,"gene"]
+  gdownecm = matrisome[matrisome$Gene.Symbol %in% gdown,]
+  ecmlist[[cluster]][["up"]] = gupecm
+  ecmlist[[cluster]][["down"]] = gdownecm
+}
+ 
+str(ecmlist,max.level = 2) 
+table(deup$cluster)
+table(dedown$cluster)
+```
+
+Make a graph showing ecm content for each cluster, up and down
+```{r}
+up = table(deup$cluster)
+down = table(dedown$cluster)
+ecmup = rep(0,length(up))
+ecmdown = rep(0,length(down))
+
+t = rbind(up,ecmup,"rup" = ecmup,down,ecmdown,"rdown" = ecmdown)
+
+for (cluster in clusters){
+  ecmup = nrow(ecmlist[[cluster]]$up)
+  ecmdown = nrow(ecmlist[[cluster]]$down)
+  t["ecmup",cluster] = ecmup
+  t["ecmdown",cluster] = ecmdown
+}
+
+t["rup",] = round(t["ecmup",]/t["up",]*100,1)
+t["rdown",] = round(t["ecmdown",]/t["down",]*100,1)
+  
+t = cbind(t,"average" = rowMeans(t,na.rm = T))
+
+#pull out exactly what you want to plot
+p = t[c("rdown","rup"),]
+```
+
+Make a bargraph of t$rup and t$rdown
+
+```{r}
+setEPS()
+postscript(file.path(dir,"Plots",paste0(Project(sobject),"_barplot_matrisome_updown.eps")))
+barplot(p, horiz = F, las=1, xlim = c(0,30),xlab = "cluster", ylab = '% matrisome associated',
+        beside=T, col=c('blue','red'),ylim = c(0,30),legend = c("downregulated","upregulated"),axis.lty = 1)
+dev.off()
+
+barplot(p, horiz = F, las=1, xlim = c(0,30),xlab = "cluster", ylab = '% matrisome associated',
+        beside=T, col=c('blue','red'),ylim = c(0,30),legend = c("downregulated","upregulated"),axis.lty = 1)
+
+```
+
+Print out important gene lists (or replace "m" with clusterlevels)
+```{r}
+imp = c()
+```
+
+Make a table that could be printed (from a list)
+```{r}
+options(width = 1000)
+for (cluster in clusters){
+  lu = ecmlist[[cluster]][["up"]][,1:3]
+  ld = ecmlist[[cluster]][["down"]][,1:3]
+  if (nrow(lu) != 0){
+    lu[,"direction"] = "up"
+  }
+  if (nrow(ld) != 0){
+    ld[,"direction"] = "down"
+  }
+  l = rbind(lu,ld)
+  l[,"cluster"] = cluster
+  imp = rbind(imp,l)
+}
+
+imp
+write.csv(imp,file = file.path(dir,"Spreadsheets",paste0(Project(sobject),"_ecmlist.csv")))
+```
+

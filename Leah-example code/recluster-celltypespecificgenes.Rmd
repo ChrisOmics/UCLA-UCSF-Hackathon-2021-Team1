@@ -1,0 +1,159 @@
+---
+title: "recluster with celltype specific genes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Load in files
+```{r}
+#install.packages("BiocManager")
+#BiocManager::install("Seurat")
+#BiocManager::install("ggplot2")
+#BiocManager::install("sctransform")
+
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(ape)
+library(cowplot)
+library(Matrix)
+library(EnhancedVolcano)
+library(knitr)
+library(readr)
+
+#find out where you are
+getwd()
+```
+
+```{r}
+name = "LDAVMO2_Trial"
+#Specify where your matrix files are
+dir= "~/Desktop/Sequencing/LD_AVM02/"
+datafolder = "Data/Seurat"
+filename = "Microglia_BC_Macrophages_subset.RData"
+specfilename = "barreslab_rnaseq.csv" #courtesy of https://brainrnaseq.org
+organism = "Mouse"
+defilename = "Macrophage_only_all_markers.csv"
+cellcyclefile = "https://raw.githubusercontent.com/lcdorman/scrnaseq/master/Spreadsheets/regev_lab_cell_cycle_genes.csv"
+
+#pick the clusters you care about
+impclusters = c(3,4,5,8)
+
+#Try to keep consistent throughout analysis
+alpha = 1e-25
+foldchange = 1.15
+
+regress = c("nCount_RNA","percent.mito")
+```
+Load in your filtered dataset
+```{r}
+load(file.path(dir,datafolder,filename))
+```
+
+```{r}
+de = read.csv(file.path(dir,"Spreadsheets",defilename),stringsAsFactors = F)
+
+#barres = read.csv(file.path(dir,"Spreadsheets",specfilename),stringsAsFactors = F)
+barres = read.csv("https://raw.githubusercontent.com/lcdorman/scrnaseq/master/Spreadsheets/barreslab_rnaseq.csv",stringsAsFactors = F)
+```
+
+Determine "cells of interest" for calculating cell type specificity in barres dataset. only change "coi"
+```{r}
+colnames(barres)
+coi = 8
+other = c(3:(coi-1),(coi+1):9)
+```
+
+*Use the barres annotation to remove non-cell-specific mRNA and recluster*
+
+This function will calculate a Cell Type specificity by dividing the fpkm for your cell type by the average fpkm for all other cell types.
+```{r}
+for (i in 1:nrow(barres)){
+  row = barres[i,]
+  mspec = as.numeric(row[coi])/mean(as.numeric(row[other]),na.rm = T)
+  barres[i,10] = mspec
+}
+colnames(barres)[10] = "Specificity"
+```
+
+
+Find specificity distribution
+
+```{r}
+mean(barres[,10])
+min(barres[,10])
+max(barres[,10])
+quantile(barres[,10],probs = c(0.5,0.90))
+#anything above 4.8 = neuron specific
+```
+Remove neuron-specific genes and recalculate pcs
+
+```{r}
+speclim = 2.5
+genes = rownames(sobject)
+length(genes)
+
+barres_sobject = barres[barres$Gene.symbol %in% genes,]
+barres_sobject = barres[barres$Specificity>speclim,]
+dim(barres_sobject)
+
+genes_remove = barres_sobject$Gene.symbol
+VariableFeatures(sobject) = VariableFeatures(sobject)[!VariableFeatures(sobject) %in% genes_remove]
+var.genes = VariableFeatures(sobject)
+```
+
+Renormalize/recalculate sobject
+```{r,eval = F}
+sobject<-ScaleData(sobject,features = var.genes, vars.to.regress = regress)
+```
+
+Run PCA analysis
+```{r}
+sobject <- RunPCA(sobject,features = var.genes,npcs = 50, verbose = FALSE)
+ElbowPlot(sobject,ndims = 50, reduction = "pca")
+print(sobject[["pca"]], dims = 1:20, nfeatures = 5)
+```
+
+Once you are satisfied with pc's, run clustering: 
+```{r}
+pcs = 1:30
+sobject<-RunUMAP(sobject,reduction = "pca",dims = pcs, verbose = F)
+sobject<-FindNeighbors(sobject,dims=pcs,verbose=F)
+
+res = 0.5 #set this to anything
+sobject<-FindClusters(sobject,verbose=F,resolution = res) 
+```
+
+```{r}
+b = barres[barres$Gene.symbol %in% var.genes,]
+b = b[order(b$Specificity,decreasing = T),]
+b[1:30,]
+```
+
+```{r}
+DimPlot(sobject,cells.highlight = names(sobject$celltypecluster)[sobject$celltypecluster == 'Microglia-3'])
+```
+Save pcs and gene list for scvelo
+
+```{r}
+pcs = sobject@reductions$pca@cell.embeddings
+pcs = cbind("Cellname" = rownames(pcs), pcs)
+write.csv(pcs, file = file.path(dir,"Spreadsheets",paste0(Project(sobject),"pcs_noneuronal.csv")),row.names = F)
+```
+
+```{r}
+genes = as.data.frame(VariableFeatures(sobject))
+colnames(genes) = "Genes"
+write.csv(genes, file = file.path(dir,"Spreadsheets",paste0(Project(sobject),"genes_noneuronal.csv")),row.names = F)
+```
+
+Save object
+```{r,eval = F}
+save(sobject,file = file.path(dir,datafolder,paste0(Project(sobject),"_microgliaspecificgenesonly.RData")))
+```
+
