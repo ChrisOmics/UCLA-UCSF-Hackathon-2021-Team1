@@ -1,0 +1,17 @@
+ID	Gender	Intermediate disease trait	PatientID
+IND0	Female		Healthy
+IND2	Male		Healthy
+IND12	Female		Healthy
+IND1	Male	Immunodeficiency,Autoimmunity	K
+IND10	Male	Autoinflammation	
+IND11	Male	Autoinflammation	
+IND13	Female	Autoinflammation	L
+IND14	Male	Immunodeficiency,Autoinflammation	G
+IND15	Male	Autoimmunity	I
+IND3	Female	Autoimmunity	J
+IND4	Female	Immunodeficiency	A
+IND5	Male	Autoinflammation	
+IND7	Male	Immunodeficiency	
+IND8	Female	Autoinflammation,Autoimmunity	H
+IND9	Male	Autoinflammation,Autoimmunity	
+IND6	Male	Immunodeficiency	B
